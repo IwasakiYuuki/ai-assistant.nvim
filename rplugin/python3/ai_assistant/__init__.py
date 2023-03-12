@@ -37,27 +37,25 @@ class AIAssistant:
         res = res.split("\n")
         self.api.buf_set_lines(self.output_buf, 0, -1, False, res)
 
-    def init_input_buf(self):
-        if not self.input_buf:
-            self.input_buf = self.api.create_buf(False, True)
-            self.api.buf_set_name(self.input_buf, "ai_assistant_input_buf")
-
     @pynvim.autocmd("BufEnter", pattern="ai_assistant_input_buf", sync=True)
-    def change_input_buf_prompt(self):
+    def on_input_bufenter(self):
+        # Change input buffer type to 'prompt' at every BufEnter event.
         if self.input_buf:
             self.api.buf_set_option(self.input_buf, "buftype", "prompt")
             self.nvim.command("call prompt_setprompt({}, '  ')".format(self.input_buf.number))
             self.nvim.command("call prompt_setcallback({}, 'Aiassistant_prompt_callback')".format(self.input_buf.number))
 
-    @pynvim.autocmd("WinLeave", pattern="ai_assistant_input_buf", sync=True)
-    def change_input_buf_nofile(self):
-        if self.input_buf:
-            self.api.buf_set_option(self.input_buf, "buftype", "nofile")
+    @pynvim.autocmd("WinLeave", pattern="ai_assistant_input_buf,ai_assistant_output_buf", sync=True)
+    def on_winleave(self):
+        self.close_win()
+        # Change input buffer type to 'nofile'.
+        # Without this setting, get a warning "save prompt buffer changes" when vim leaving.
+        self.api.buf_set_option(self.input_buf, "buftype", "nofile")
 
-    def init_output_buf(self):
-        if not self.output_buf:
-            self.output_buf = self.api.create_buf(False, True)
-            self.api.buf_set_name(self.output_buf, "ai_assistant_output_buf")
+    def init_input_buf(self):
+        if not self.input_buf:
+            self.input_buf = self.api.create_buf(False, True)
+            self.api.buf_set_name(self.input_buf, "ai_assistant_input_buf")
 
     def open_input_win(self):
         self.init_input_buf()
@@ -80,6 +78,11 @@ class AIAssistant:
             self.api.win_close(self.input_win, True)
             self.input_win = None
 
+    def init_output_buf(self):
+        if not self.output_buf:
+            self.output_buf = self.api.create_buf(False, True)
+            self.api.buf_set_name(self.output_buf, "ai_assistant_output_buf")
+
     def open_output_win(self):
         self.init_output_buf()
         editor_width, editor_height = self.get_editor_dimensions()
@@ -101,14 +104,6 @@ class AIAssistant:
             self.api.win_close(self.output_win, True)
             self.output_win = None
 
-    @pynvim.autocmd("BufEnter", pattern="ai_assistant_input_buf,ai_assistant_output_buf")
-    def set_keymap(self):
-        pass
-
-    @pynvim.autocmd("WinLeave", pattern="ai_assistant_input_buf,ai_assistant_output_buf", sync=True)
-    def on_aiassistant_buf_winleave(self):
-        self.close_win()
-
     def get_editor_dimensions(self):
         windows = self.api.list_wins()
         width = 0
@@ -125,14 +120,3 @@ class AIAssistant:
         input_win = self.api.win_is_valid(self.input_win) if self.input_win else False
         output_win = self.api.win_is_valid(self.output_win) if self.output_win else False
         return input_win and output_win
-
-    @pynvim.command("AIAssistantCodeCompletion")
-    def code_completion(self):
-        if not (self.input_win and self.output_win):
-            self.toggle_aiassistant()
-
-        instruction = self.api.buf_get_lines(self.input_buf, 0, -1, False)
-        instruction = "\n".join(instruction)
-        res = RequestChatGPT.generate_code(instruction)
-        res = res.split("\n")
-        self.api.buf_set_lines(self.output_buf, 0, -1, False, res)
