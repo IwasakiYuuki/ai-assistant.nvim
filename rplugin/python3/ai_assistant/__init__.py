@@ -36,7 +36,7 @@ class AIAssistant:
         instruction = args[0]
         res = RequestChatGPT.generate_code(instruction)
         res = res.split("\n")
-        self.api.buf_set_lines(self.output_buf, 0, -1, False, res)
+        self.set_output(res)
 
     @pynvim.autocmd("BufEnter", pattern="ai_assistant_input_buf", sync=True)
     def on_input_bufenter(self):
@@ -98,6 +98,7 @@ class AIAssistant:
     def init_output_buf(self):
         self.output_buf = self.api.create_buf(False, True)
         self.api.buf_set_name(self.output_buf, "ai_assistant_output_buf")
+        self.api.buf_set_option(self.output_buf, "modifiable", False)
 
     def open_output_win(self):
         editor_width, editor_height = self.get_editor_dimensions()
@@ -119,6 +120,13 @@ class AIAssistant:
         if self.output_win and self.api.win_is_valid(self.output_win):
             self.api.win_close(self.output_win, True)
             self.output_win = None
+
+    def set_output(self, lines):
+        # To avoid accidentally changing the output of chatGPT,
+        # basically "modifiable" is setted off.
+        self.api.buf_set_option(self.output_buf, "modifiable", True)
+        self.api.buf_set_lines(self.output_buf, 0, -1, False, lines)
+        self.api.buf_set_option(self.output_buf, "modifiable", False)
 
     def get_editor_dimensions(self):
         width = self.nvim.eval("&columns")
