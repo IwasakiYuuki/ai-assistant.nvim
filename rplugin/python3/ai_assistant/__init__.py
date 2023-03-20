@@ -8,6 +8,8 @@ class AIAssistant:
     def __init__(self, nvim: Nvim):
        self.nvim = nvim 
        self.api = nvim.api
+       self.message_history = []
+       self.output_win = None
        self.init_input_buf()
        self.init_output_buf()
        self.input_win = None
@@ -31,12 +33,19 @@ class AIAssistant:
         self.close_input_win()
         self.close_output_win()
 
-    @pynvim.function("_aiassistant_prompt_callback", sync=True)
-    def prompt_callback(self, args):
-        instruction = args[0]
-        res = RequestChatGPT.generate_code(instruction)
-        res = res.split("\n")
-        self.set_output(res)
+    @pynvim.function("_aiassistant_chat_completion")
+    def chat_completion(self, args):
+        input_content = args[0]
+        current_input_message = {"role": "user", "content": input_content}
+        messages = self.message_history + [current_input_message]
+        output_content = RequestChatGPT.chat_completions("gpt-3.5-turbo", messages, timeout=30)
+        current_output_message = {"role": "system", "content": output_content}
+        self.message_history.append(current_input_message)
+        self.message_history.append(current_output_message)
+        self.set_history()
+        if self.output_win and self._is_wins_open():
+            self.nvim.command("echomsg('{}')".format(self.output_win.handle))
+            self.nvim.command("call win_execute({}, 'normal G')".format(self.output_win.handle))
 
     @pynvim.autocmd("BufEnter", pattern="ai_assistant_input_buf", sync=True)
     def on_input_bufenter(self):
@@ -44,7 +53,7 @@ class AIAssistant:
         if self.input_buf:
             self.api.buf_set_option(self.input_buf, "buftype", "prompt")
             self.nvim.command("call prompt_setprompt({}, '  ')".format(self.input_buf.number))
-            self.nvim.command("call prompt_setcallback({}, 'Aiassistant_prompt_callback')".format(self.input_buf.number))
+            self.nvim.command("call prompt_setcallback({}, 'Aiassistant_chat_completion')".format(self.input_buf.number))
 
     @pynvim.autocmd("WinLeave", pattern="ai_assistant_input_buf,ai_assistant_output_buf")
     def on_input_output_winleave(self):
@@ -60,6 +69,14 @@ class AIAssistant:
             # Without this setting, get a warning "save prompt buffer changes" when vim leaving.
             self.api.buf_set_option(self.input_buf, "buftype", "nofile")
 
+    @property
+    def width_ratio(self) -> float:
+        return 0.6
+
+    @property
+    def height_ratio(self) -> float:
+        return 0.6
+
     def init_input_buf(self):
         self.input_buf = self.api.create_buf(False, True)
         self.api.buf_set_name(self.input_buf, "ai_assistant_input_buf")
@@ -71,17 +88,21 @@ class AIAssistant:
             km(self.output_buf, mode, lhs, rhs, {})
 
         if self.input_win and self.output_win:
-            _set_keymap(self, "n", "<C-k>", ":call nvim_set_current_win({})<cr>".format(input_win_number))
-            _set_keymap(self, "n", "<C-j>", ":call nvim_set_current_win({})<cr>".format(output_win_number))
+            _set_keymap(self, "n", "<C-i>", ":call nvim_set_current_win({})<cr>".format(input_win_number))
+            _set_keymap(self, "n", "<C-o>", ":call nvim_set_current_win({})<cr>".format(output_win_number))
 
     def open_input_win(self):
         editor_width, editor_height = self.get_editor_dimensions()
+        width, height = int(editor_width * self.width_ratio), 1
+        output_height = int(editor_height * self.height_ratio)
+        col = int((editor_width - width) / 2)
+        row = editor_height - (int((editor_height - output_height) / 2) + height - 1)
         win_config = {
             "relative": "editor",
-            "width": int(editor_width * 0.6),
-            "height": int(1),
-            "col": int(editor_width * 0.2),
-            "row": int(editor_height * 0.1),
+            "width": int(width),
+            "height": int(height),
+            "col": int(col),
+            "row": int(row),
             "border": "rounded",
             "style": "minimal",
             "title": "input",
@@ -102,12 +123,15 @@ class AIAssistant:
 
     def open_output_win(self):
         editor_width, editor_height = self.get_editor_dimensions()
+        width, height = int(editor_width * self.width_ratio), int(editor_height * self.height_ratio)
+        col = int((editor_width - width) / 2)
+        row = int((editor_height - height) / 2)
         win_config = {
             "relative": "editor",
-            "width": int(editor_width * 0.6),
-            "height": int(editor_height * 0.5),
-            "col": int(editor_width * 0.2),
-            "row": int(1 + editor_height * 0.1 + 2),
+            "width": width,
+            "height": height - 2,
+            "col": col,
+            "row": row,
             "border": "rounded",
             "style": "minimal",
             "title": "output",
@@ -121,10 +145,22 @@ class AIAssistant:
             self.api.win_close(self.output_win, True)
             self.output_win = None
 
-    def set_output(self, lines):
+    def set_history(self):
         # To avoid accidentally changing the output of chatGPT,
         # basically "modifiable" is setted off.
         self.api.buf_set_option(self.output_buf, "modifiable", True)
+        lines = []
+        for message in self.message_history:
+            role = message["role"]
+            content = message["content"]
+            if role == "system":
+                lines.append("  AI")
+            elif role == "user":
+                lines.append("  user")
+            for line in content.split("\n"):
+                lines.append(line)
+            lines.append("")
+
         self.api.buf_set_lines(self.output_buf, 0, -1, False, lines)
         self.api.buf_set_option(self.output_buf, "modifiable", False)
 
