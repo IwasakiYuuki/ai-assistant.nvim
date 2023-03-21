@@ -22,12 +22,14 @@ class AIAssistant:
 
     @pynvim.function("_aiassistant_open_win", sync=True)
     def open_win(self, *args):
+        _ = args
         input_win = self.open_input_win()
         output_win = self.open_output_win()
         self.set_keymap(input_win.handle, output_win.handle)
 
     @pynvim.function("_aiassistant_close_win", sync=True)
     def close_win(self, *args):
+        _ = args
         self.close_input_win()
         self.close_output_win()
 
@@ -84,8 +86,6 @@ class AIAssistant:
             "row": int(editor_height * 0.1),
             "border": "rounded",
             "style": "minimal",
-            "title": "input",
-            "title_pos": "center",
         }
         self.input_win = self.api.open_win(self.input_buf, True, win_config)
         return self.input_win
@@ -110,7 +110,7 @@ class AIAssistant:
             "row": int(1 + editor_height * 0.1 + 2),
             "border": "rounded",
             "style": "minimal",
-            "title": "output",
+            "title": "AI Assistant",
             "title_pos": "center",
         }
         self.output_win = self.api.open_win(self.output_buf, False, win_config)
