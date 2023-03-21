@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import List, Dict, Tuple
 import openai
 from openai.openai_object import OpenAIObject
 import asyncio
@@ -9,7 +9,7 @@ class RequestChatGPT:
         pass
 
     @staticmethod
-    def chat_completions(model: str, messages: List[Dict[str, str]], **kwargs) -> str:
+    def chat_completions(model: str, messages: List[Dict[str, str]], **kwargs) -> Tuple[str, int]:
         """Request message to ChatGPT model for chat completions.
         API reference: https://platform.openai.com/docs/api-reference/chat
 
@@ -81,7 +81,7 @@ class RequestChatGPT:
             **kwargs,
         )
         if isinstance(res, OpenAIObject):
-            return res["choices"][0]["message"]["content"]
+            return res["choices"][0]["message"]["content"], res["usage"]["total_tokens"]
         else:
             raise TypeError("The type of response was expected OpenAIObject, but got {type(res)}")
 
