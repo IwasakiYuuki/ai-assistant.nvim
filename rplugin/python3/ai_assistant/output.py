@@ -36,6 +36,8 @@ class AIAssistantOutput:
             "border": "rounded",
             "style": "minimal",
             "zindex": 50,
+            "title": "Chat History",
+            "title_pos": "center",
         }
         return config
 
@@ -43,17 +45,19 @@ class AIAssistantOutput:
         editor_width, editor_height = self._get_editor_dimensions()
         width = int(editor_width * self.width_ratio)
         height = int(editor_height * self.height_ratio) - 4
-        col = int((editor_width - width) / 2) + width - 23
+        col = int((editor_width - width) / 2) + width - 13
         row = int((editor_height - height) / 2) + 1
         config = {
             "relative": "editor",
-            "width": 20,
+            "width": 10,
             "height": 1,
             "col": col,
             "row": row,
             "border": "rounded",
             "style": "minimal",
             "zindex": 51,
+            "title": "Cost",
+            "title_pos": "center",
         }
         return config
 
@@ -115,5 +119,5 @@ class AIAssistantOutput:
 
     def show_cost(self):
         cost = self.total_token * 0.001 * 0.002
-        lines = ["Total: $ {:.4f}".format(cost)]
+        lines = ["$ {:.4f}".format(cost)]
         self.api.buf_set_lines(self.cost_buf, 0, -1, False, lines)
