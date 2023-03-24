@@ -28,6 +28,10 @@ class AIAssistant:
         else:
             self.open()
 
+    @pynvim.command("AIAssistantRefresh")
+    def refresh(self):
+        self.output.refresh()
+
     def open(self):
         self.input.open()
         self.output.open()
@@ -42,6 +46,7 @@ class AIAssistant:
         if self.input.window and self.output.window:
             _set_keymap(self, "n", "<C-i>", ":call nvim_set_current_win({})<cr>".format(self.input.window.handle))
             _set_keymap(self, "n", "<C-o>", ":call nvim_set_current_win({})<cr>".format(self.output.window.handle))
+            _set_keymap(self, "i", "<C-r>", "<ESC>:AIAssistantRefresh<cr>i".format(self.output.window.handle))
 
     def close(self):
         self.input.close()

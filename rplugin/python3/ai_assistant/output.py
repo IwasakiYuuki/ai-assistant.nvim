@@ -121,3 +121,8 @@ class AIAssistantOutput:
         cost = self.total_token * 0.001 * 0.002
         lines = ["$ {:.4f}".format(cost)]
         self.api.buf_set_lines(self.cost_buf, 0, -1, False, lines)
+
+    def refresh(self):
+        self.history = []
+        self.total_token = 0
+        self.show()
