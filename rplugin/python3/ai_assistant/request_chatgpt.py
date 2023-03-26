@@ -1,7 +1,6 @@
 from typing import List, Dict, Tuple
 import openai
 from openai.openai_object import OpenAIObject
-import asyncio
 
 
 class RequestChatGPT:
@@ -9,7 +8,13 @@ class RequestChatGPT:
         pass
 
     @staticmethod
-    def chat_completions(model: str, messages: List[Dict[str, str]], **kwargs) -> Tuple[str, int]:
+    async def chat_completions(
+        model: str,
+        messages: List[Dict[str, str]],
+        # timeout: int = 15,
+        # request_timeout: int = 15,
+        **kwargs
+    ) -> Tuple[str, int]:
         """Request message to ChatGPT model for chat completions.
         API reference: https://platform.openai.com/docs/api-reference/chat
 
@@ -78,6 +83,8 @@ class RequestChatGPT:
         res = openai.ChatCompletion.create(
             model = model,
             messages = messages,
+            # timeout = timeout,
+            # request_timeout = request_timeout,
             **kwargs,
         )
         if isinstance(res, OpenAIObject):

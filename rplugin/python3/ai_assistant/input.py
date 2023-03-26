@@ -59,7 +59,7 @@ class AIAssistantInput:
     def set_prompt(self):
         self.api.buf_set_option(self.buf, "buftype", "prompt")
         self.nvim.command("call prompt_setprompt({}, '  ')".format(self.buf.number))
-        self.nvim.command("call prompt_setcallback({}, 'Aiassistant_chat_completion')".format(self.buf.number))
+        self.nvim.command("call prompt_setcallback({}, 'Aiassistant_start_chat_completion')".format(self.buf.number))
 
     def unset_prompt(self):
         self.api.buf_set_option(self.buf, "buftype", "nofile")

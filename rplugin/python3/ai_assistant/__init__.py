@@ -1,6 +1,7 @@
 import pynvim
+import asyncio
 from pynvim.api.nvim import Nvim
-from ai_assistant.request_chatgpt import RequestChatGPT
+from .request_chatgpt import RequestChatGPT
 from .input import AIAssistantInput
 from .output import AIAssistantOutput
 
@@ -12,6 +13,7 @@ class AIAssistant:
         self.api = nvim.api
         self.input = AIAssistantInput(nvim, self.width_ratio, self.height_ratio)
         self.output = AIAssistantOutput(nvim, self.width_ratio, self.height_ratio)
+        self.request_task = None
 
     @property
     def width_ratio(self) -> float:
@@ -21,14 +23,14 @@ class AIAssistant:
     def height_ratio(self) -> float:
         return 0.6
 
-    @pynvim.command("AIAssistantToggle")
+    @pynvim.command("AIAssistantToggle", sync=True)
     def toggle(self):
         if self.is_open():
             self.close()
         else:
             self.open()
 
-    @pynvim.command("AIAssistantRefresh")
+    @pynvim.command("AIAssistantRefresh", sync=True)
     def refresh(self):
         self.output.refresh()
 
@@ -47,6 +49,8 @@ class AIAssistant:
             _set_keymap(self, "n", "<C-i>", ":call nvim_set_current_win({})<cr>".format(self.input.window.handle))
             _set_keymap(self, "n", "<C-o>", ":call nvim_set_current_win({})<cr>".format(self.output.window.handle))
             _set_keymap(self, "i", "<C-r>", "<ESC>:AIAssistantRefresh<cr>i".format(self.output.window.handle))
+            _set_keymap(self, "i", "<C-c>", "<ESC>:call _aiassistant_stop_chat_completion()<cr>i".format(self.output.window.handle))
+            _set_keymap(self, "n", "<C-c>", ":call _aiassistant_stop_chat_completion()<cr>".format(self.output.window.handle))
 
     def close(self):
         self.input.close()
@@ -71,14 +75,43 @@ class AIAssistant:
             self.close()
             self.input.unset_prompt()
 
-    @pynvim.function("_aiassistant_chat_completion")
-    def chat_completion(self, args):
+    @pynvim.function("_aiassistant_stop_chat_completion", sync=False)
+    def stop_chat_completion(self, _):
+        if self.request_task:
+            self.request_task.cancel()
+            self.request_task = None
+
+    @pynvim.function("_aiassistant_start_chat_completion", sync=True)
+    def start_chat_completion(self, args):
         input_content = args[0]
+        self.nvim.async_call(self.show_waiting_notification)
+        self.request_task = asyncio.create_task(self.request_chat_completion(input_content))
+
+    def show_waiting_notification(self):
+        self.nvim.command(
+            "lua require('notify')('Waiting for message'"
+            ", 'info', {timeout = 5000})"
+        )
+
+    def show_recieve_notification(self):
+        command = "lua require('notify')('Message recieved: $ {:.5f}'".format(self.output.get_cost())
+        command += ", 'success', {timeout = 3000})"
+        self.nvim.command(command)
+
+    async def request_chat_completion(self, input_content):
         current_input_message = {"role": "user", "content": input_content}
         messages = self.output.get_history() + [current_input_message]
-        output_content, total_token = RequestChatGPT.chat_completions("gpt-3.5-turbo", messages, timeout=30)
+        output_content, token = await RequestChatGPT.chat_completions("gpt-3.5-turbo", messages)
         current_output_message = {"role": "system", "content": output_content}
+        self.output.set_token(token)
         self.output.add_history(current_input_message)
         self.output.add_history(current_output_message)
-        self.output.add_total_token(total_token)
+        def update_buf():
+            self.nvim.command("doautocmd User AIAssistantChatUpdate")
+        self.nvim.async_call(update_buf)
+
+    @pynvim.function("_aiassistant_chat_update", sync=True)
+    def chat_update(self, args):
+        _ = args
         self.output.show()
+        self.show_recieve_notification()
