@@ -25,6 +25,8 @@ This is a Neovim plugin that allows ChatGPT to be used from within the editor.
 },
 {
   "IwasakiYuuki/ai-assistant.nvim",
+  branch = "develop",
+  build = ":UpdateRemotePlugins",
   dependencies = { "rcarriga/nvim-notify" },
 }
 ```
