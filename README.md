@@ -14,6 +14,7 @@ This is a Neovim plugin that allows ChatGPT to be used from within the editor.
 # Requirements
 - Neovim nightly
 - [rcarriga/nvim-notify](https://github.com/rcarriga/nvim-notify)
+- Setting environment `OPENAI_API_KEY` using OpenAI API
 
 
 # Install
